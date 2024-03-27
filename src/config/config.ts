@@ -24,4 +24,10 @@ export enum WalletTypes {
   OKX = "Okx",
 }
 
+export enum RaffleStatus {
+  PENDING = 0,
+  START = 1,
+  END = 2,
+}
+
 export const TOKEN_PRICE = 100;
