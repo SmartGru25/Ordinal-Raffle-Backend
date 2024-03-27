@@ -139,14 +139,17 @@ const getTxHexById = async (txId: string) => {
 
 // Generate Send Ordinal PSBT
 export const generateSendOrdinalPSBT = async (
-  walletType: WalletTypes,
+  sellerWalletType: WalletTypes,
+  buyerWalletType: WalletTypes,
   inscriptionId: string,
   buyerPaymentPubkey: string,
   buyerOrdinalAddress: string,
   buyerOrdinalPubkey: string,
   sellerPaymentAddress: string,
+  sellerOrdinalPubkey: string,
   price: number
 ) => {
+  console.log("inscription id", inscriptionId);
   const sellerInscriptionsWithUtxo = await getInscriptionWithUtxo(
     inscriptionId
   );
@@ -164,7 +167,11 @@ export const generateSendOrdinalPSBT = async (
       value: sellerInscriptionsWithUtxo.value,
       script: sellerScriptpubkey,
     },
-    sighashType: Bitcoin.Transaction.SIGHASH_ALL,
+    tapInternalKey:
+      sellerWalletType === WalletTypes.XVERSE ||
+      sellerWalletType === WalletTypes.OKX
+        ? Buffer.from(sellerOrdinalPubkey, "hex")
+        : Buffer.from(sellerOrdinalPubkey, "hex").slice(1, 33),
   });
 
   // Add Inscription Output to buyer's address
@@ -175,7 +182,7 @@ export const generateSendOrdinalPSBT = async (
 
   let paymentAddress, paymentoutput;
 
-  if (walletType === WalletTypes.XVERSE) {
+  if (buyerWalletType === WalletTypes.XVERSE) {
     const hexedPaymentPubkey = Buffer.from(buyerPaymentPubkey, "hex");
     const p2wpkh = Bitcoin.payments.p2wpkh({
       pubkey: hexedPaymentPubkey,
@@ -190,8 +197,8 @@ export const generateSendOrdinalPSBT = async (
     paymentAddress = address;
     paymentoutput = redeem?.output;
   } else if (
-    walletType === WalletTypes.UNISAT ||
-    walletType === WalletTypes.OKX
+    buyerWalletType === WalletTypes.UNISAT ||
+    buyerWalletType === WalletTypes.OKX
   ) {
     paymentAddress = buyerOrdinalAddress;
   }
@@ -211,7 +218,10 @@ export const generateSendOrdinalPSBT = async (
 
       buyerPaymentsignIndexes.push(psbt.inputCount);
 
-      if (walletType === WalletTypes.UNISAT || walletType === WalletTypes.OKX) {
+      if (
+        buyerWalletType === WalletTypes.UNISAT ||
+        buyerWalletType === WalletTypes.OKX
+      ) {
         psbt.addInput({
           hash: utxo.txid,
           index: utxo.vout,
@@ -220,12 +230,12 @@ export const generateSendOrdinalPSBT = async (
             script: Buffer.from(utxo.scriptpubkey as string, "hex"),
           },
           tapInternalKey:
-            walletType === WalletTypes.OKX
+            buyerWalletType === WalletTypes.OKX
               ? Buffer.from(buyerOrdinalPubkey, "hex")
               : Buffer.from(buyerOrdinalPubkey, "hex").slice(1, 33),
           sighashType: Bitcoin.Transaction.SIGHASH_ALL,
         });
-      } else if (walletType === WalletTypes.XVERSE) {
+      } else if (buyerWalletType === WalletTypes.XVERSE) {
         const txHex = await getTxHexById(utxo.txid);
 
         psbt.addInput({
@@ -252,131 +262,11 @@ export const generateSendOrdinalPSBT = async (
     value: amount - price - fee,
   });
 
-  console.log(psbt.toBase64());
-
   return {
-    psbt: psbt.toHex(),
+    psbt: psbt,
     buyerPaymentsignIndexes,
   };
 };
-
-// // Generate Send Ordinal PSBT
-// export const generateSendOrdinalPSBTFromAdmin = async (
-//   walletType: WalletTypes,
-//   inscriptionId: string,
-//   buyerOrdinalAddress: string,
-//   sellerPaymentPubkey: string,
-//   sellerOrdinalAddress: string,
-//   sellerOrdinalPubkey: string
-// ) => {
-//   const sellerInscriptionsWithUtxo = await getInscriptionWithUtxo(
-//     inscriptionId
-//   );
-//   const sellerScriptpubkey = Buffer.from(
-//     sellerInscriptionsWithUtxo.scriptpubkey,
-//     "hex"
-//   );
-//   const psbt = new Bitcoin.Psbt({ network: network });
-
-//   // Add Inscription Input
-//   psbt.addInput({
-//     hash: sellerInscriptionsWithUtxo.txid,
-//     index: sellerInscriptionsWithUtxo.vout,
-//     witnessUtxo: {
-//       value: sellerInscriptionsWithUtxo.value,
-//       script: sellerScriptpubkey,
-//     },
-//     sighashType: Bitcoin.Transaction.SIGHASH_ALL,
-//   });
-
-//   // Add Inscription Output to buyer's address
-//   psbt.addOutput({
-//     address: buyerOrdinalAddress,
-//     value: sellerInscriptionsWithUtxo.value,
-//   });
-
-//   let paymentAddress, paymentoutput;
-
-//   if (walletType === WalletTypes.XVERSE) {
-//     const hexedPaymentPubkey = Buffer.from(sellerPaymentPubkey, "hex");
-//     const p2wpkh = Bitcoin.payments.p2wpkh({
-//       pubkey: hexedPaymentPubkey,
-//       network: network,
-//     });
-
-//     const { address, redeem } = Bitcoin.payments.p2sh({
-//       redeem: p2wpkh,
-//       network: network,
-//     });
-
-//     paymentAddress = address;
-//     paymentoutput = redeem?.output;
-//   } else if (
-//     walletType === WalletTypes.UNISAT ||
-//     walletType === WalletTypes.OKX
-//   ) {
-//     paymentAddress = sellerOrdinalAddress;
-//   }
-
-//   const btcUtxos = await getBtcUtxoByAddress(paymentAddress as string);
-//   const feeRate = await getFeeRate();
-
-//   let amount = 0;
-
-//   const buyerPaymentsignIndexes: number[] = [];
-
-//   for (const utxo of btcUtxos) {
-//     const fee = calculateTxFee(psbt, feeRate);
-
-//     if (amount < fee && utxo.value > 10000) {
-//       amount += utxo.value;
-
-//       buyerPaymentsignIndexes.push(psbt.inputCount);
-
-//       if (walletType === WalletTypes.UNISAT || walletType === WalletTypes.OKX) {
-//         psbt.addInput({
-//           hash: utxo.txid,
-//           index: utxo.vout,
-//           witnessUtxo: {
-//             value: utxo.value,
-//             script: Buffer.from(utxo.scriptpubkey as string, "hex"),
-//           },
-//           tapInternalKey:
-//             walletType === WalletTypes.OKX
-//               ? Buffer.from(sellerOrdinalPubkey, "hex")
-//               : Buffer.from(sellerOrdinalPubkey, "hex").slice(1, 33),
-//           sighashType: Bitcoin.Transaction.SIGHASH_ALL,
-//         });
-//       } else if (walletType === WalletTypes.XVERSE) {
-//         const txHex = await getTxHexById(utxo.txid);
-
-//         psbt.addInput({
-//           hash: utxo.txid,
-//           index: utxo.vout,
-//           redeemScript: paymentoutput,
-//           nonWitnessUtxo: Buffer.from(txHex, "hex"),
-//           sighashType: Bitcoin.Transaction.SIGHASH_ALL,
-//         });
-//       }
-//     }
-//   }
-
-//   const fee = calculateTxFee(psbt, feeRate);
-
-//   if (amount < fee) throw "You do not have enough bitcoin in your wallet";
-
-//   psbt.addOutput({
-//     address: paymentAddress as string,
-//     value: amount - fee,
-//   });
-
-//   console.log(psbt.toBase64());
-
-//   return {
-//     psbt: psbt,
-//     buyerPaymentsignIndexes,
-//   };
-// };
 
 // Generate Send BTC PSBT
 export const generateSendBTCPSBT = async (
@@ -411,6 +301,13 @@ export const generateSendBTCPSBT = async (
     walletType === WalletTypes.OKX
   ) {
     paymentAddress = buyerOrdinalAddress;
+  } else if (walletType === WalletTypes.HIRO) {
+    const hexedPaymentPubkey = Buffer.from(buyerPaymentPubkey, "hex");
+    const { address, output } = Bitcoin.payments.p2wpkh({
+      pubkey: hexedPaymentPubkey,
+      network: network,
+    });
+    paymentAddress = address;
   }
 
   console.log(paymentAddress);
@@ -440,6 +337,15 @@ export const generateSendBTCPSBT = async (
               ? Buffer.from(buyerOrdinalPubkey, "hex")
               : Buffer.from(buyerOrdinalPubkey, "hex").slice(1, 33),
           sighashType: Bitcoin.Transaction.SIGHASH_ALL,
+        });
+      } else if (walletType === WalletTypes.HIRO) {
+        psbt.addInput({
+          hash: utxo.txid,
+          index: utxo.vout,
+          witnessUtxo: {
+            value: utxo.value,
+            script: Buffer.from(utxo.scriptpubkey as string, "hex"),
+          },
         });
       } else if (walletType === WalletTypes.XVERSE) {
         const txHex = await getTxHexById(utxo.txid);
@@ -483,7 +389,7 @@ export const generateSendBTCPSBT = async (
   console.log(psbt.toBase64());
 
   return {
-    psbt: psbt.toHex(),
+    psbt: psbt,
     buyerPaymentsignIndexes,
   };
 };
@@ -552,4 +458,10 @@ const postData = async (
         throw new Error("Got an err when push tx");
     }
   }
+};
+
+export const finalizePsbtInput = (hexedPsbt: string, inputs: number[]) => {
+  const psbt = Bitcoin.Psbt.fromHex(hexedPsbt);
+  inputs.forEach((input) => psbt.finalizeInput(input));
+  return psbt.toHex();
 };

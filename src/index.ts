@@ -5,7 +5,10 @@ import bodyParser from "body-parser";
 import cors from "cors";
 import cron from "node-cron";
 import raffleRoutes from "./routes/raffleRoutes";
-import { chooseRaffleWinner } from "./controller/raffleController";
+import {
+  chooseRaffleWinner,
+  checkTxStatus,
+} from "./controller/raffleController";
 
 dotenv.config();
 
@@ -43,4 +46,5 @@ app.use("/api/raffle", raffleRoutes);
 cron.schedule("*/1 * * * *", () => {
   console.log("Update Raffles Every 1 mins");
   chooseRaffleWinner();
+  checkTxStatus();
 });

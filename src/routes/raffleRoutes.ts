@@ -5,6 +5,7 @@ import {
   buyTickets,
   buyTicketsCombineAndPush,
   getRaffles,
+  getRaffleHistory,
 } from "../controller/raffleController";
 
 const router = express.Router();
@@ -18,6 +19,14 @@ router.use((req, res, next) => {
 router.get("/get-raffles", async (req, res, next) => {
   try {
     await getRaffles(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/get-raffle-history/:ordinalAddress", async (req, res, next) => {
+  try {
+    await getRaffleHistory(req, res);
   } catch (error) {
     next(error);
   }

@@ -4,15 +4,26 @@ const RaffleSchema = new Schema(
   {
     ticketPrice: Number,
     ordinalInscription: String,
-    ticketList: Array,
+    ticketList: {
+      type: Array,
+      default: [],
+    },
     ticketAmounts: Number,
     createTime: Number,
-    endTime: Number,
+    endTime: {
+      type: Number,
+      default: 100000000000000,
+    },
+    endTimePeriod: Number,
     winner: String,
     creatorOrdinalAddress: String,
     creatorPaymentAddress: String,
-    status: Number,
+    status: {
+      type: Number,
+      default: 0,
+    }, // 0: Create Pending, 1: Created, 2: Finished
     walletType: String,
+    createRaffleTx: String,
   },
   {
     timestamps: {
