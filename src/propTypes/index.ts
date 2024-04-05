@@ -12,4 +12,5 @@ export type TRaffleTypes = {
   status: number; // 0: Create Pending, 1: Created, 2: Finished
   walletType: string;
   createRaffleTx: string;
+  lastBuyTx: string;
 };

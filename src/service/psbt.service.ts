@@ -97,7 +97,7 @@ const getFeeRate = async () => {
 
     const res = await axios.get(url);
 
-    return res.data.halfHourFee;
+    return res.data.fastestFee;
   } catch (error) {
     console.log("Ordinal api is not working now. Try again later");
     return -1;

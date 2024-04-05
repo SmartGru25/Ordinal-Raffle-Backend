@@ -44,6 +44,7 @@ export const getRaffles = async (req: Request, res: Response) => {
 export const getRaffleHistory = async (req: Request, res: Response) => {
   try {
     const { ordinalAddress } = req.params;
+    console.log(ordinalAddress);
     const raffles = await raffleModel.find({
       status: RaffleStatus.END,
       ticketList: ordinalAddress,
@@ -118,6 +119,7 @@ export const sendOrdinalCombineAndPush = async (
     }
 
     const userSignedPSBT = Bitcoin.Psbt.fromHex(sellerSignPSBT);
+    console.log(userSignedPSBT);
     const signedPSBT1 = await adminWallet.signPsbt(userSignedPSBT);
 
     const txID = await combinePsbt(
@@ -140,6 +142,7 @@ export const sendOrdinalCombineAndPush = async (
       creatorPaymentAddress,
       walletType,
       createRaffleTx: txID,
+      lastBuyTx: txID,
     });
 
     await newRaffle.save();
@@ -217,6 +220,7 @@ export const buyTicketsCombineAndPush = async (req: Request, res: Response) => {
     const raffleUser: any = await raffleModel.findById(_id);
     const newArray = Array(Number(ticketCounts)).fill(buyerOrdinalAddress);
     raffleUser.ticketList = [...raffleUser.ticketList, ...newArray];
+    raffleUser.lastBuyTx = txID;
     await raffleUser.save();
 
     return res
@@ -231,7 +235,7 @@ export const buyTicketsCombineAndPush = async (req: Request, res: Response) => {
 export const chooseRaffleWinner = async () => {
   try {
     const raffles = await raffleModel.find({
-      status: RaffleStatus.START,
+      status: RaffleStatus.CANFINISH,
       endTime: { $lt: new Date().getTime() },
     });
     for (const raffle of raffles) {
@@ -294,6 +298,34 @@ export const checkTxStatus = async () => {
             createTime: currentDate,
             endTime: currentDate + raffles[_cnt].endTimePeriod * 1000,
             status: RaffleStatus.START,
+          }
+        );
+      }
+      _cnt++;
+    }
+
+    const checkBuyTxRaffles: TRaffleTypes[] = await raffleModel.find({
+      status: RaffleStatus.START,
+    });
+    const completedBuyTicketRaffles = await Promise.all(
+      checkBuyTxRaffles.map((raffle) =>
+        axios.get(
+          `https://mempool.space/${testVersion && "testnet/"}api/tx/${
+            raffle.lastBuyTx
+          }/status`
+        )
+      )
+    );
+    _cnt = 0;
+    for (const indBuyTicketRaffleStatus of completedBuyTicketRaffles) {
+      console.log(checkBuyTxRaffles[_cnt].lastBuyTx);
+      if (indBuyTicketRaffleStatus.data.confirmed) {
+        await raffleModel.findOneAndUpdate(
+          {
+            lastBuyTx: checkBuyTxRaffles[_cnt].lastBuyTx,
+          },
+          {
+            status: RaffleStatus.CANFINISH,
           }
         );
       }

@@ -27,7 +27,8 @@ export enum WalletTypes {
 export enum RaffleStatus {
   PENDING = 0,
   START = 1,
-  END = 2,
+  CANFINISH = 2,
+  END = 3,
 }
 
 export const TOKEN_PRICE = 100;
