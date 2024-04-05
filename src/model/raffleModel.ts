@@ -21,9 +21,10 @@ const RaffleSchema = new Schema(
     status: {
       type: Number,
       default: 0,
-    }, // 0: Create Pending, 1: Created, 2: Finished
+    }, // 0: Create Pending, 1: Created, 2: Buy Ticket Completed, 3: Finished
     walletType: String,
     createRaffleTx: String,
+    lastBuyTx: String,
   },
   {
     timestamps: {
