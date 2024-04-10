@@ -306,6 +306,7 @@ export const checkTxStatus = async () => {
 
     const checkBuyTxRaffles: TRaffleTypes[] = await raffleModel.find({
       status: RaffleStatus.START,
+      endTime: { $lt: currentDate },
     });
     const completedBuyTicketRaffles = await Promise.all(
       checkBuyTxRaffles.map((raffle) =>
