@@ -275,7 +275,8 @@ export const generateSendBTCPSBT = async (
   buyerOrdinalAddress: string,
   buyerOrdinalPubkey: string,
   sellerPaymentAddress: string,
-  price: number
+  price: number,
+  collectionOwner: boolean
 ) => {
   const psbt = new Bitcoin.Psbt({ network: network });
 
@@ -361,19 +362,20 @@ export const generateSendBTCPSBT = async (
     }
   }
 
+  const serviceFee = collectionOwner ? 0 : SERVICE_FEE_PERCENT;
+
   if (price > 0) {
     psbt.addOutput({
       address: sellerPaymentAddress,
       value: parseInt(
-        (((price * (100 - SERVICE_FEE_PERCENT)) / 100) * 10 ** 8).toString()
+        (((price * (100 - serviceFee)) / 100) * 10 ** 8).toString()
       ),
     });
-    psbt.addOutput({
-      address: ADMIN_PAYMENT_ADDRESS,
-      value: parseInt(
-        (((price * SERVICE_FEE_PERCENT) / 100) * 10 ** 8).toString()
-      ),
-    });
+    if (!collectionOwner)
+      psbt.addOutput({
+        address: ADMIN_PAYMENT_ADDRESS,
+        value: parseInt((((price * serviceFee) / 100) * 10 ** 8).toString()),
+      });
   }
 
   const fee = calculateTxFee(psbt, feeRate);

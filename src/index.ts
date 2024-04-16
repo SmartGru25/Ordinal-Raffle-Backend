@@ -9,6 +9,10 @@ import {
   chooseRaffleWinner,
   checkTxStatus,
 } from "./controller/raffleController";
+import {
+  fetchGoblinHolders,
+  fetchAllowInscriptions,
+} from "./controller/fetchInfoController";
 
 dotenv.config();
 
@@ -28,8 +32,10 @@ mongoose
   .connect(process.env.MONGO_URI as string)
   .then(async () => {
     console.log("Connected to the database! ❤️");
-    app.listen(port, () => {
+    app.listen(port, async () => {
       console.log(`Server running on port ${port}`);
+      await fetchGoblinHolders();
+      fetchAllowInscriptions();
     });
   })
   .catch((err) => {
@@ -43,8 +49,14 @@ app.get("/", (req: Request, res: Response) => {
 
 app.use("/api/raffle", raffleRoutes);
 
-cron.schedule("*/1 * * * *", () => {
-  console.log("Update Raffles Every 1 mins");
+let cnt = 0;
+cron.schedule("*/5 * * * *", () => {
+  console.log("Update Raffles Every 5 mins");
   chooseRaffleWinner();
   checkTxStatus();
+  if (cnt === 3600 / 5) {
+    fetchGoblinHolders();
+    cnt = 0;
+  }
+  cnt++;
 });

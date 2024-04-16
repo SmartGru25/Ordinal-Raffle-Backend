@@ -14,3 +14,14 @@ export type TRaffleTypes = {
   createRaffleTx: string;
   lastBuyTx: string;
 };
+
+export type THolderTypes = {
+  wallet: string;
+  inscription_ids: Array<string>;
+};
+
+export type TInscriptionTypes = {
+  name: string;
+  inscription_id: string;
+  inscription_number: number;
+};
