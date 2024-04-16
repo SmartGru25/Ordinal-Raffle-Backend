@@ -3,6 +3,7 @@ import * as ecc from "tiny-secp256k1";
 import { Request, Response } from "express";
 import axios from "axios";
 import raffleModel from "../model/raffleModel";
+import userInfoModel from "../model/userInfoModel";
 import {
   combinePsbt,
   generateSendBTCPSBT,
@@ -47,7 +48,7 @@ export const getRaffleHistory = async (req: Request, res: Response) => {
     console.log(ordinalAddress);
     const raffles = await raffleModel.find({
       status: RaffleStatus.END,
-      ticketList: ordinalAddress,
+      // ticketList: ordinalAddress,
     });
     return res.status(200).json({ success: true, raffles });
   } catch (error) {
@@ -64,6 +65,22 @@ export const sendOrdinal = async (req: Request, res: Response) => {
       creatorPaymentAddress,
       creatorOrdinalPubkey,
     } = req.body;
+
+    const infoModel = await userInfoModel.findOne({ exist: 1 });
+    if (!infoModel)
+      return res
+        .status(500)
+        .json({ success: false, msg: "Database is not ready yet" });
+    const whiteListInscription =
+      infoModel.whiteListInscriptions.includes(ordinalInscription);
+
+    if (!whiteListInscription)
+      return res
+        .status(500)
+        .json({
+          success: false,
+          msg: "Ordinal Collection is not Approved yet!",
+        });
 
     const { psbt, buyerPaymentsignIndexes } = await generateSendOrdinalPSBT(
       walletType,
@@ -173,13 +190,23 @@ export const buyTickets = async (req: Request, res: Response) => {
         .status(500)
         .json({ success: false, msg: "All of Tickets are sold" });
 
+    const infoModel = await userInfoModel.findOne({ exist: 1 });
+    if (!infoModel)
+      return res
+        .status(500)
+        .json({ success: false, msg: "Database is not ready yet" });
+    const collectionOwner = infoModel.goblinHoldersWalletList.includes(
+      raffles.creatorOrdinalAddress
+    );
+
     const { psbt, buyerPaymentsignIndexes } = await generateSendBTCPSBT(
       walletType,
       buyerPayPubkey,
       buyerOrdinalAddress,
       buyerOrdinalPubkey,
       raffles.creatorPaymentAddress,
-      raffles.ticketPrice * ticketCounts
+      raffles.ticketPrice * ticketCounts,
+      collectionOwner
     );
 
     return res.status(200).json({
